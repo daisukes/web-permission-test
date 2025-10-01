@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Permission Test - Video and Audio</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-top: 0;
+        }
+        .status-section {
+            margin: 20px 0;
+        }
+        .status-item {
+            display: flex;
+            align-items: center;
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+        .status-label {
+            font-weight: bold;
+            margin-right: 10px;
+            min-width: 120px;
+        }
+        .status-value {
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+        .status-granted {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .status-denied {
+            background-color: #f44336;
+            color: white;
+        }
+        .status-prompt {
+            background-color: #ff9800;
+            color: white;
+        }
+        .status-pending {
+            background-color: #9e9e9e;
+            color: white;
+        }
+        .video-section {
+            margin: 30px 0;
+        }
+        video {
+            width: 100%;
+            max-width: 640px;
+            height: auto;
+            border-radius: 8px;
+            background-color: #000;
+            display: block;
+            margin: 10px 0;
+        }
+        .info-box {
+            background-color: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .error-box {
+            background-color: #ffebee;
+            border-left: 4px solid #f44336;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .error-message {
+            color: #c62828;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Web Permission Test</h1>
+        
+        <div class="info-box">
+            <p><strong>Purpose:</strong> This page tests web browser video and audio permission requests.</p>
+            <p>On page load, the browser will automatically request access to your camera and microphone.</p>
+        </div>
+
+        <div class="status-section">
+            <h2>Permission Status</h2>
+            <div class="status-item">
+                <span class="status-label">Camera:</span>
+                <span id="cameraStatus" class="status-value status-pending">Requesting...</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Microphone:</span>
+                <span id="microphoneStatus" class="status-value status-pending">Requesting...</span>
+            </div>
+        </div>
+
+        <div id="errorContainer"></div>
+
+        <div class="video-section">
+            <h2>Live Preview</h2>
+            <video id="videoElement" autoplay playsinline muted></video>
+        </div>
+    </div>
+
+    <script>
+        // Request permissions on page load
+        window.addEventListener('DOMContentLoaded', async () => {
+            const videoElement = document.getElementById('videoElement');
+            const cameraStatus = document.getElementById('cameraStatus');
+            const microphoneStatus = document.getElementById('microphoneStatus');
+            const errorContainer = document.getElementById('errorContainer');
+
+            // Function to update status display
+            function updateStatus(element, status, message) {
+                element.textContent = message;
+                element.className = 'status-value status-' + status;
+            }
+
+            // Function to display error
+            function showError(message) {
+                const errorBox = document.createElement('div');
+                errorBox.className = 'error-box';
+                errorBox.innerHTML = `
+                    <strong>Error:</strong>
+                    <p class="error-message">${message}</p>
+                `;
+                errorContainer.appendChild(errorBox);
+            }
+
+            try {
+                // Request both video and audio permissions
+                updateStatus(cameraStatus, 'prompt', 'Requesting...');
+                updateStatus(microphoneStatus, 'prompt', 'Requesting...');
+
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: true
+                });
+
+                // If we get here, both permissions were granted
+                updateStatus(cameraStatus, 'granted', 'Granted');
+                updateStatus(microphoneStatus, 'granted', 'Granted');
+
+                // Display the video stream
+                videoElement.srcObject = stream;
+
+                console.log('Successfully obtained media stream');
+                console.log('Video tracks:', stream.getVideoTracks());
+                console.log('Audio tracks:', stream.getAudioTracks());
+
+            } catch (error) {
+                console.error('Error accessing media devices:', error);
+
+                // Determine which permission was denied or what error occurred
+                if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+                    updateStatus(cameraStatus, 'denied', 'Denied');
+                    updateStatus(microphoneStatus, 'denied', 'Denied');
+                    showError('Permission was denied. Please allow access to camera and microphone and reload the page.');
+                } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+                    updateStatus(cameraStatus, 'denied', 'Not Found');
+                    updateStatus(microphoneStatus, 'denied', 'Not Found');
+                    showError('No camera or microphone found. Please connect a device and reload the page.');
+                } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+                    updateStatus(cameraStatus, 'denied', 'Error');
+                    updateStatus(microphoneStatus, 'denied', 'Error');
+                    showError('Device is already in use by another application.');
+                } else if (error.name === 'OverconstrainedError') {
+                    updateStatus(cameraStatus, 'denied', 'Error');
+                    updateStatus(microphoneStatus, 'denied', 'Error');
+                    showError('The requested media constraints could not be satisfied.');
+                } else if (error.name === 'NotSupportedError') {
+                    updateStatus(cameraStatus, 'denied', 'Not Supported');
+                    updateStatus(microphoneStatus, 'denied', 'Not Supported');
+                    showError('Your browser does not support getUserMedia API. Please use a modern browser.');
+                } else if (error.name === 'TypeError') {
+                    updateStatus(cameraStatus, 'denied', 'Error');
+                    updateStatus(microphoneStatus, 'denied', 'Error');
+                    showError('Invalid constraints. Please check the configuration.');
+                } else {
+                    updateStatus(cameraStatus, 'denied', 'Error');
+                    updateStatus(microphoneStatus, 'denied', 'Error');
+                    showError(`An error occurred: ${error.message}`);
+                }
+            }
+        });
+
+        // Clean up on page unload
+        window.addEventListener('beforeunload', () => {
+            const videoElement = document.getElementById('videoElement');
+            if (videoElement.srcObject) {
+                videoElement.srcObject.getTracks().forEach(track => track.stop());
+            }
+        });
+    </script>
+</body>
+</html>
