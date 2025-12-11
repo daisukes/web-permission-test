@@ -19,6 +19,7 @@ When you open the page, the browser will automatically prompt you to allow acces
 ### Online (GitHub Pages)
 
 Visit the live demo: [https://daisukes.github.io/web-permission-test/](https://daisukes.github.io/web-permission-test/)
+Visit the live demo (autoplay): [https://daisukes.github.io/web-permission-test/autoplay.html](https://daisukes.github.io/web-permission-test/autoplay.html)
 
 ### Local Testing
 
