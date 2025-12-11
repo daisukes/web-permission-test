@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>iOS autoplay test</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; padding: 20px; }
+    h1 { font-size: 1.4rem; }
+    .status { margin: 0.5em 0; padding: 0.5em; border: 1px solid #ddd; background:#fafafa; }
+    .note { color: #555; font-size: 0.9rem }
+    audio { display:block; margin: 0.2em 0 0.8em 0 }
+  </style>
+</head>
+<body>
+  <h1>iOSでのaudio autoplayテスト</h1>
+  <p class="note">このページは、iOS上でaudio要素のautoplayが許可されるかどうかを調べるためのテストページです。直接埋め込んだ場合と、iframeに入れて <code>allow="autoplay"</code> を付与した場合の挙動を比較します。</p>
+
+  <section>
+    <h2>直接のaudio要素</h2>
+    <p>audio#a1: autoplay（muted無し） — 通常はモバイルではブロックされる想定</p>
+    <audio id="a1" src="https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3" autoplay playsinline preload="auto"></audio>
+    <div id="status-a1" class="status">status: pending</div>
+
+    <p>audio#a2: autoplay + muted — mutedがあれば自動再生される可能性があります</p>
+    <audio id="a2" src="https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3" autoplay muted playsinline preload="auto"></audio>
+    <div id="status-a2" class="status">status: pending</div>
+
+    <button id="try-play">プログラムからa1を再生 (user gestureボタン)</button>
+  </section>
+
+  <section>
+    <h2>iframe内（allow="autoplay"）</h2>
+    <p class="note">以下のiframeは同一URL（このファイル）を読み込みます。親側で <code>allow="autoplay"</code> を指定しているため、iframe内部のautoplay挙動を確認できます。サーバー側での <code>Permissions-Policy</code> ヘッダやレスポンスヘッダの設定も併せてテストしてください。</p>
+    <iframe id="test-frame" src="autoplay.html?embedded=1" allow="autoplay" width="100%" height="140" style="border:1px solid #ccc"></iframe>
+    <div id="status-iframe" class="status">iframe status: pending</div>
+  </section>
+
+  <!-- 埋め込み（iframe）で読み込まれたときに表示する要素 -->
+  <div id="status-embedded" style="display:none">
+    <p>（iframe内の結果表示領域）</p>
+  </div>
+
+  <script>
+    function setStatus(id, text) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = text;
+      console.log(id, text);
+    }
+
+    async function tryPlay(el) {
+      try {
+        const p = el.play();
+        if (p !== undefined) {
+          await p;
+          return { ok: true, message: 'play() succeeded' };
+        }
+        return { ok: true, message: 'play() returned undefined (started?)' };
+      } catch (err) {
+        return { ok: false, message: (err && err.message) ? err.message : String(err) };
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const isEmbedded = location.search.indexOf('embedded=1') !== -1;
+
+      const a1 = document.getElementById('a1');
+      const a2 = document.getElementById('a2');
+
+      if (isEmbedded) {
+        // iframe内で読み込まれた場合: a1でautoplayを試す（親へ結果をpostMessageで通知）
+        (async () => {
+          const res = await tryPlay(a1);
+          // iframe内用の表示領域
+          let s = document.getElementById('status-embedded');
+          if (!s) {
+            s = document.createElement('div');
+            s.id = 'status-embedded';
+            document.body.appendChild(s);
+          }
+          s.style.display = '';
+          s.textContent = 'embedded autoplay: ' + (res.ok ? 'succeeded' : 'failed') + ' — ' + res.message;
+
+          // 親に結果を送る
+          try {
+            parent.postMessage({ type: 'autoplay-test', result: s.textContent }, '*');
+          } catch (e) {
+            console.warn('postMessage failed', e);
+          }
+        })();
+        return;
+      }
+
+      // 非埋め込み（トップレベル）でのテスト
+      (async () => {
+        setStatus('status-a1', 'testing...');
+        const r1 = await tryPlay(a1);
+        setStatus('status-a1', r1.ok ? 'autoplay succeeded — ' + r1.message : 'autoplay failed — ' + r1.message);
+
+        setStatus('status-a2', 'testing...');
+        const r2 = await tryPlay(a2);
+        setStatus('status-a2', r2.ok ? 'autoplay succeeded — ' + r2.message : 'autoplay failed — ' + r2.message);
+      })();
+
+      document.getElementById('try-play').addEventListener('click', async () => {
+        setStatus('status-a1', 'attempting programmatic play (user gesture)...');
+        const res = await tryPlay(a1);
+        setStatus('status-a1', res.ok ? 'programmatic play succeeded — ' + res.message : 'programmatic play failed — ' + res.message);
+      });
+
+      window.addEventListener('message', (ev) => {
+        if (!ev.data) return;
+        if (ev.data.type === 'autoplay-test') {
+          setStatus('status-iframe', 'iframe reported: ' + ev.data.result);
+        }
+      });
+    });
+  </script>
+</body>
+</html>
